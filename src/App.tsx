@@ -1,3 +1,3 @@
-import CladesPrototype from './CladesPrototype';
+import TaxoGuessr from './TaxoGuessr';
 
-export default CladesPrototype;
+export default TaxoGuessr;

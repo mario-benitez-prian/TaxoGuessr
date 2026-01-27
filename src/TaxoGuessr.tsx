@@ -28,6 +28,20 @@ type PerSpeciesStats = {
 
 type AllStats = Record<string, PerSpeciesStats>; // keyed by species.id
 
+// Tipos para datasets personalizados
+type UploadResults = {
+  found: Species[];
+  notFound: string[];
+  total: number;
+};
+
+type SavedDataset = {
+  name: string;
+  species: Species[];
+  createdAt: string;
+  count: number;
+};
+
 // key para localStorage de Achievements
 const STORAGE_KEY = 'clades_stats_v1';
 // key para localStorage de logros
@@ -94,7 +108,7 @@ function percentRankCoverage(statsObj: AllStats, rank: keyof Taxonomy){
 }
 
 
-export default function CladesPrototype(){
+export default function TaxoGuessr(){
   const [screen, setScreen] = useState<'home' | 'game' | 'profile'>('home');
   const [remaining, setRemaining] = useState<Species[]>(() => shuffle(SPECIES.slice()));
   const [current, setCurrent] = useState<Species | null>(() => remaining[0] || null);
@@ -106,6 +120,9 @@ export default function CladesPrototype(){
   // Estado para información de Wikipedia (texto + imagen)
   const [wikiInfo, setWikiInfo] = useState<Record<string, { text: string; image?: string }>>({});
   const [popupVisible, setPopupVisible] = useState<Record<string, boolean>>({});
+  const [uploadingDataset, setUploadingDataset] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [uploadResults, setUploadResults] = useState<UploadResults | null>(null);
 
   // Función para abrir/ cerrar popup y fetch de Wikipedia
   function togglePopup(rank: keyof Taxonomy) {
@@ -516,7 +533,7 @@ export default function CladesPrototype(){
       const correctCount = RANKS.reduce((acc, r) => acc + ((s.correctByRank[r] || 0) > 0 ? 1 : 0), 0);
       return { species: sp, attempts, correctCount };
     }).filter(item => item.attempts > 0)
-      .sort((a, b) => a.correctCount - b.correctCount);
+    .sort((a, b) => a.correctCount - b.correctCount);
 
     /*// --- NUEVO: construir la lista de especies jugadas con fallos ---
     // Para cada especie tomamos su entry en stats y contamos cuántas categorías
@@ -543,8 +560,268 @@ export default function CladesPrototype(){
     // ordenar peor → mejor (menos aciertos primero)
     .sort((a, b) => a.correctCount - b.correctCount);*/
 
+    // Funciones para añadir datasets nuevos 
+    // Añade estos estados al inicio del componente (después de los otros useState)
+
+
+
     return { playedSpecies, totalSpecies: SPECIES.length, speciesCorrectAll, rankPct, speciesList, playedSpeciesList, /*failedSpeciesList*/ };
+
   },[stats]);
+
+
+// Funciones para el sistema de datasets personalizados
+// ============= FUNCIONES PARA DATASETS PERSONALIZADOS =============
+
+const readTxtFile = (file: File): Promise<string[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      if (!e.target || !e.target.result) {
+        reject(new Error('No se pudo leer el archivo'));
+        return;
+      }
+      const text = e.target.result as string;
+      const lines = text
+        .split('\n')
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0);
+      resolve(lines);
+    };
+    reader.onerror = () => reject(new Error('Error al leer el archivo'));
+    reader.readAsText(file);
+  });
+};
+
+const fetchFromWikidata = async (scientificName: string): Promise<Species | null> => {
+  try {
+    // 1. Buscar la entidad en Wikidata
+    const searchUrl = `https://www.wikidata.org/w/api.php?action=wbsearchentities&search=${encodeURIComponent(
+      scientificName
+    )}&language=es&format=json&origin=*`;
+
+    const searchRes = await fetch(searchUrl);
+    const searchData: any = await searchRes.json();
+
+    if (!searchData.search || searchData.search.length === 0) {
+      return null;
+    }
+
+    const qid: string = searchData.search[0].id;
+
+    // 2. Obtener los datos de la entidad
+    const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json`;
+    const entityRes = await fetch(entityUrl);
+    const entityData: any = await entityRes.json();
+    const entity: any = entityData.entities[qid];
+
+    if (!entity) return null;
+
+    // Construir taxonomía navegando hacia arriba
+    const taxonomy: Taxonomy = {
+      phylum: '',
+      class: '',
+      order: '',
+      family: '',
+      genus: '',
+      species: scientificName
+    };
+
+    // Obtener la cadena de taxones padre
+    let currentQid: string | null = qid;
+    const visitedQids = new Set<string>([currentQid]);
+    const maxIterations = 20;
+    let iterations = 0;
+
+    while (currentQid && iterations < maxIterations) {
+      iterations++;
+      
+      try {
+        const taxonUrl: string = `https://www.wikidata.org/wiki/Special:EntityData/${currentQid}.json`;
+        const taxonRes: Response = await fetch(taxonUrl);
+        const taxonData: any = await taxonRes.json();
+        const taxonEntity: any = taxonData.entities[currentQid];
+
+        if (!taxonEntity) break;
+
+        // Obtener el rango taxonómico (P105)
+        const rankClaim: any = taxonEntity.claims?.P105?.[0];
+        const rankQid: string | undefined = rankClaim?.mainsnak?.datavalue?.value?.id;
+
+        // QIDs de rangos taxonómicos en Wikidata
+        const rankMap: Record<string, keyof Taxonomy> = {
+          'Q34740': 'genus',
+          'Q7432': 'species',
+          'Q35409': 'family',
+          'Q36602': 'order',
+          'Q37517': 'class',
+          'Q38348': 'phylum'
+        };
+
+        if (rankQid) {
+          const rankName = rankMap[rankQid];
+          
+          if (rankName && taxonomy[rankName] === '') {
+            const taxonName = taxonEntity.labels?.es?.value || 
+                             taxonEntity.labels?.en?.value || 
+                             taxonEntity.labels?.la?.value || '';
+            taxonomy[rankName] = taxonName;
+          }
+        }
+
+        // Obtener el taxón padre (P171)
+        const parentClaim: any = taxonEntity.claims?.P171?.[0];
+        const parentQid: string | undefined = parentClaim?.mainsnak?.datavalue?.value?.id;
+
+        if (!parentQid || visitedQids.has(parentQid)) break;
+        
+        visitedQids.add(parentQid);
+        currentQid = parentQid;
+
+        // Pequeña pausa para no saturar la API
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+      } catch (error) {
+        console.error('Error fetching taxon:', error);
+        break;
+      }
+    }
+
+    // Nombre común (priorizar español)
+    const commonName = entity.labels?.es?.value || 
+                      entity.labels?.en?.value || 
+                      scientificName;
+
+    return {
+      id: scientificName,
+      display: commonName,
+      sci: scientificName,
+      taxonomy: taxonomy
+    };
+
+  } catch (error) {
+    console.error('Error fetching from Wikidata:', scientificName, error);
+    return null;
+  }
+};
+
+const buildDataset = async (
+  speciesList: string[], 
+  onProgress?: (current: number, total: number) => void
+): Promise<{ results: Species[]; notFound: string[] }> => {
+  const results: Species[] = [];
+  const notFound: string[] = [];
+
+  for (let i = 0; i < speciesList.length; i++) {
+    const sci = speciesList[i];
+    
+    if (onProgress) {
+      onProgress(i + 1, speciesList.length);
+    }
+
+    const data = await fetchFromWikidata(sci);
+    
+    if (!data || !data.taxonomy.genus) {
+      notFound.push(sci);
+      continue;
+    }
+
+    results.push(data);
+    
+    // Pausa entre peticiones para no saturar la API
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+
+  return { results, notFound };
+};
+
+const saveDataset = (name: string, data: Species[]): boolean => {
+  try {
+    const allDatasets = JSON.parse(localStorage.getItem('taxoguessr_datasets') || '{}') as Record<string, SavedDataset>;
+    allDatasets[name] = {
+      name: name,
+      species: data,
+      createdAt: new Date().toISOString(),
+      count: data.length
+    };
+    localStorage.setItem('taxoguessr_datasets', JSON.stringify(allDatasets));
+    return true;
+  } catch (e) {
+    console.error('Error saving dataset:', e);
+    return false;
+  }
+};
+
+const loadDatasets = (): Record<string, SavedDataset> => {
+  try {
+    return JSON.parse(localStorage.getItem('taxoguessr_datasets') || '{}') as Record<string, SavedDataset>;
+  } catch (e) {
+    return {};
+  }
+};
+
+const handleDatasetUpload = async (file: File): Promise<void> => {
+  setUploadingDataset(true);
+  setUploadResults(null);
+  setUploadProgress({ current: 0, total: 0 });
+
+  try {
+    // Leer archivo
+    const speciesList = await readTxtFile(file);
+    
+    if (speciesList.length === 0) {
+      alert('El archivo está vacío o no contiene nombres válidos');
+      setUploadingDataset(false);
+      return;
+    }
+
+    // Construir dataset
+    const { results, notFound } = await buildDataset(
+      speciesList,
+      (current: number, total: number) => setUploadProgress({ current, total })
+    );
+
+    if (results.length === 0) {
+      alert('No se pudo encontrar información para ninguna especie');
+      setUploadingDataset(false);
+      return;
+    }
+
+    // Mostrar resultados
+    setUploadResults({
+      found: results,
+      notFound: notFound,
+      total: speciesList.length
+    });
+
+  } catch (error) {
+    console.error('Error processing dataset:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+    alert('Error al procesar el archivo: ' + errorMessage);
+  } finally {
+    setUploadingDataset(false);
+  }
+};
+
+const saveUploadedDataset = (): void => {
+  if (!uploadResults || uploadResults.found.length === 0) return;
+
+  const name = prompt('Nombre para este dataset:');
+  if (!name || name.trim() === '') return;
+
+  const success = saveDataset(name.trim(), uploadResults.found);
+  
+  if (success) {
+    alert(`Dataset "${name}" guardado con ${uploadResults.found.length} especies`);
+    setUploadResults(null);
+    // Forzar re-render para mostrar el nuevo botón
+    setScreen('home');
+  } else {
+    alert('Error al guardar el dataset');
+  }
+};
+
+// ============= FIN FUNCIONES DATASETS =============
 
 
 
@@ -633,6 +910,137 @@ export default function CladesPrototype(){
           >
             Comenzar partida
           </button>
+
+          {/* Sección de datasets personalizados */}
+          <div style={{ marginTop: 30, borderTop: '1px solid #e2e8f0', paddingTop: 20 }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: 16 }}>Crear dataset personalizado</h3>
+            
+            <div style={{ 
+              background: '#f8fafc', 
+              padding: 15, 
+              borderRadius: 12,
+              marginBottom: 15 
+            }}>
+              <p className="small" style={{ marginBottom: 10, color: '#475569' }}>
+                Sube un archivo .txt con nombres científicos (uno por línea) para crear tu propio dataset.
+              </p>
+              
+              <input
+                type="file"
+                accept=".txt"
+                onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  await handleDatasetUpload(file);
+                  e.target.value = ''; // Reset input
+                }}
+                disabled={uploadingDataset}
+                style={{ marginBottom: 10 }}
+              />
+
+              {/* Progreso de carga */}
+              {uploadingDataset && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="small" style={{ marginBottom: 5 }}>
+                    Procesando especies: {uploadProgress.current} / {uploadProgress.total}
+                  </div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: 8, 
+                    background: '#e2e8f0', 
+                    borderRadius: 4,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{ 
+                      width: `${(uploadProgress.current / uploadProgress.total) * 100}%`,
+                      height: '100%',
+                      background: '#3a6963',
+                      transition: 'width 0.3s'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Resultados de la carga */}
+              {uploadResults && (
+                <div style={{ 
+                  marginTop: 15, 
+                  padding: 15, 
+                  background: 'white',
+                  borderRadius: 8,
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: 14 }}>Resultados</h4>
+                  
+                  <div style={{ marginBottom: 10 }}>
+                    <span style={{ color: '#059669', fontWeight: 600 }}>
+                      ✓ {uploadResults.found.length} especies encontradas
+                    </span>
+                  </div>
+
+                  {uploadResults.notFound.length > 0 && (
+                    <div style={{ marginBottom: 15 }}>
+                      <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                        ✗ {uploadResults.notFound.length} especies no encontradas:
+                      </span>
+                      <div style={{ 
+                        marginTop: 8,
+                        padding: 10,
+                        background: '#fef2f2',
+                        borderRadius: 6,
+                        fontSize: 13,
+                        maxHeight: 100,
+                        overflowY: 'auto'
+                      }}>
+                        {uploadResults.notFound.join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={saveUploadedDataset}
+                    style={{ width: '100%' }}
+                  >
+                    Guardar dataset ({uploadResults.found.length} especies)
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Lista de datasets guardados */}
+            <div>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: 14 }}>Datasets guardados</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {Object.values(loadDatasets()).map((dataset) => {
+                  const typedDataset = dataset as SavedDataset;
+                  return (
+                    <button
+                      key={typedDataset.name}
+                      className="ghost"
+                      onClick={() => {
+                        // TODO: Implementar carga del dataset
+                        alert(`Cargar dataset "${typedDataset.name}" (${typedDataset.count} especies)\n\nFuncionalidad pendiente de implementar`);
+                      }}
+                      style={{ 
+                        padding: '8px 12px',
+                        fontSize: 13
+                      }}
+                    >
+                      📁 {typedDataset.name} ({typedDataset.count})
+                    </button>
+                  );
+                })}
+                
+                {Object.keys(loadDatasets()).length === 0 && (
+                  <div className="small" style={{ color: '#94a3b8' }}>
+                    No hay datasets guardados aún
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          
 
         </div>
       </div>
