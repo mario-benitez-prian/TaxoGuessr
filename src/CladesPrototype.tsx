@@ -1,26 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import SPECIES_JSON from './species_100_gbif.json';
 
-const SPECIES = SPECIES_JSON.slice(0, 5);
+import { appStyles as style } from './styles/app';
+
+import { Taxonomy, Species, RANKS, RANKS_ES } from './data/taxonomy';
+import { SPECIES } from './data/species';
+import { Achievement, ACH_DEFS } from './data/achievements';
+
 //
 // Variables declaration and typescritps
 //
 
-type Taxonomy = {
-  phylum: string;
-  class: string;
-  order: string;
-  family: string;
-  genus: string;
-  species: string;
-};
 
-type Species = {
-  id: string;
-  display: string;
-  sci: string;
-  taxonomy: Taxonomy;
-};
 
 type LastResult = {
   points: number;
@@ -36,16 +26,6 @@ type PerSpeciesStats = {
   lastAttemptByRank: Record<keyof Taxonomy, boolean>; // resultado del último intento (true = acierto)
 };
 
-type Achievement = {
-  id: string;
-  title: string;
-  description: string;
-  info?: string;
-  image?: string;            // ruta en public o URL
-  unlocked: boolean;
-  unlockedAt?: string;
-};
-
 type AllStats = Record<string, PerSpeciesStats>; // keyed by species.id
 
 // key para localStorage de Achievements
@@ -53,23 +33,6 @@ const STORAGE_KEY = 'clades_stats_v1';
 // key para localStorage de logros
 const ACH_KEY = 'clades_achievements_v1';
 
-const RANKS: (keyof Taxonomy)[] = ['phylum','class','order','family','genus','species'];
-
-// definición estática de los logros/trofeos
-const ACH_DEFS: Omit<Achievement, 'unlocked'|'unlockedAt'>[] = [
-  { id: 'first_play', title: 'El novato', description: 'Has jugado tu primera especie', info: '', image: '/achievements/medalla_filosofia.png' },
-  { id: '25_species', title: 'Trofeo Linn Margulis', description: 'Has completado el 25% de las especies!', info: 'La gran aportación de Lynn Margulis a la taxonomía y biología evolutiva fue la Teoría de la Endosimbiosis Seriada, explicando que las células eucariotas (con núcleo) surgieron de la fusión simbiótica de bacterias procariotas, dando origen a mitocondrias y cloroplastos, y propuso, junto a Whittaker, la clasificación de los seres vivos en cinco reinos (Moneras, Protoctistas, Hongos, Plantas y Animales) basada en la simbiogénesis, enfatizando la cooperación sobre la competencia en la evolución. ', image: '/achievements/trofeo_lynn.png' },
-  { id: '50_species', title: 'Trofeo Aristóteles', description: 'Has completado el 50% de las especies!', info: 'Aristóteles es considerado el padre de la taxonomía por crear el primer sistema jerárquico de clasificación biológica, dividiendo el mundo natural en dos grandes reinos (Animal y Vegetal) y clasificando a los animales según la presencia de sangre (con sangre roja vs. sin sangre) y características como hábitat y forma de reproducción, sentando las bases para la organización científica de los seres vivos mediante la observación empírica. Introdujo por primera vez conceptos como el género y la especie.', image: '/achievements/trofeo_aristoteles.png' },
-  { id: '75_species', title: 'Trofeo Darwin', description: 'Has completado el 75% de las especies!', info: '', image: '/achievements/trofeo_darwin.png' },
-  { id: '100_species', title: 'Trofeo Linneo', description: 'Has completado el 100% de las species!', info: '', image: '/achievements/trofeo_linneo.png' },
-
-  { id: '80_phylum', title: 'Amante de la filosofía', description: 'Has acertado el 80% de los filos!', info: '', image: '/achievements/medalla_filosofia.png' },
-  { id: '80_class', title: 'Amante de lo clásico', description: 'Has acertado el 80% de las clases!', info: '', image: '/achievements/medalla_clasico.png' },
-  { id: '80_order', title: 'Amante del orden', description: 'Has acertado el 80% de los ordenes!', info: '', image: '/achievements/medalla_orden.png'},
-  { id: '80_family', title: 'Amante del orden', description: 'Has acertado el 80% de las familias!', info: '', image: '/achievements/medalla_familia.png' },
-  { id: '80_genus', title: 'Generalista', description: 'Has acertado el 80% de los géneros!', info: '', image: '/achievements/medalla_genero.png' },
-  { id: '80_species', title: 'Amante de las especies', description: 'Has acertado el 80% de las especies!', info: '', image: '/achievements/medalla_especie.png' }
-];
 
 //
 // App logic
@@ -154,7 +117,7 @@ export default function CladesPrototype(){
 
     // Fetch info si no está cargada
     if (!wikiInfo[correctCategory] && !visible) {
-      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(correctCategory)}`;
+      const url = `https://es.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(correctCategory)}`;
       fetch(url)
         .then(res => res.json())
         .then(data => {
@@ -298,7 +261,7 @@ export default function CladesPrototype(){
   function fetchImage(title: string){
     setLoadingImage(true); setImageUrl(null);
     const encoded = encodeURIComponent(title);
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`;
+    const url = `https://es.wikipedia.org/api/rest_v1/page/summary/${encoded}`;
     fetch(url)
       .then(r=>r.json())
       .then(j=>{
@@ -586,207 +549,7 @@ export default function CladesPrototype(){
 
 
 
-  //
-  // App style
-  //
-
-  const style = `:root{--bg:#f7fbff;--card:#ffffff;--accent:rgba(58, 105, 99, 0.9);--muted:#6b7280}
-  .wrap{max-width:720px;margin:18px auto;padding:12px;font-family:Inter,system-ui,Segoe UI,Helvetica,Arial,sans-serif}
-  .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(20,30,60,0.06);padding:14px}
-  header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-  h1{font-size:18px;margin:0}
-  .meta{color:var(--muted);font-size:13px}
-  .image{width:100%;height:220px;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#e6f0ff,#fff);display:flex;align-items:center;justify-content:center}
-  img{width:100%;height:100%;object-fit:cover}
-  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-  input{width:100%;padding:10px;border-radius:8px;border:1px solid #e6e9ef;font-size:14px}
-  .row{display:flex;gap:8px;margin-top:8px}
-  .col{flex:1}
-  .controls{display:flex;gap:8px;margin-top:6px}
-  input.input-correct {
-    border-color: #34d399; /* verde */
-    box-shadow: inset 0 0 0 6px rgba(52,211,153,0.08);
-    transition: box-shadow 180ms, border-color 180ms;
-  }
-  input.input-wrong {
-    border-color: #f87171; /* rojo */
-    box-shadow: inset 0 0 0 6px rgba(248,113,113,0.08);
-    transition: box-shadow 180ms, border-color 180ms;
-  }
-  button{background:var(--accent);color:white;border:0;padding:10px 14px;border-radius:10px;font-weight:600}
-  .ghost{background:transparent;color:var(--accent);border:1px solid rgba(59,130,246,0.12)}
-  .small{font-size:13px;color:var(--muted)}
-  .top-right{position:absolute;right:18px;top:18px;display:flex;gap:8px}
-  .progress-row{display:flex;align-items:center;gap:12px;margin:8px 0}
-  .progress-bar{flex:1;height:12px;background:#eef6ff;border-radius:999px;overflow:hidden}
-  .progress-fill{height:100%;background:var(--accent)}
-  .species-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9}
-  .species-left{display:flex;gap:12px;align-items:center}
-  .small-muted{font-size:12px;color:#94a3b8}
-   /* resaltado suave para inputs tras enviar respuesta */
-  /* pequeño progreso para cada especie */
-  .progress-mini {
-    width: 80px;
-    height: 6px;
-    border-radius: 4px;
-    background: #e2e8f0;
-    overflow: hidden;
-  }
-  .progress-mini-fill {
-    height: 100%;
-    background: rgba(58, 105, 99, 0.9);
-    transition: width 0.25s;
-  }
-
-  .card-mini {
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  background: rgb(251, 253, 255);
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.cgi-title {
-  font-size: 14px;
-  color: #334155;
-  margin-bottom: 6px;
-}
-
-.cgi-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cgi-progress-bar {
-  flex: 1;
-  height: 6px;
-  background: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.cgi-progress-bar-fill {
-  height: 100%;
-  background: rgba(58, 105, 99, 0.9);
-  transition: width 0.25s;
-}
-
-.cgi-progress-text {
-  font-size: 13px;
-  color: #334155;
-  font-weight: 600;
-}
-
-.achievements-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.achievement {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-
-  /* Ajustes que evitan solapamiento */
-  width: 100%;           /* ocupa la columna completa */
-  max-width: 100%;       /* nunca se salga del grid */
-  box-sizing: border-box;
-  padding: 12px;
-  border-radius: 12px;
-  background: #f4f6fa;
-
-  /* Flex permite que el contenido se adapte */
-  flex-shrink: 1;
-}
-
-/* Overlay con efecto blur */
-.achievement-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-
-  /* Ligero tinte para mejorar contraste */
-  background-color: rgba(255, 255, 255, 0.08);
-}
-
-/* Caja del popup */
-.achievement-modal {
-  background: #ffffff;
-  padding: 20px;
-  border-radius: 12px;
-  max-width: 420px;
-  width: 80%;
-  text-align: center;
-
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-}
-
-/* Imagen del logro */
-.achievement-image {
-  width: 100%;      /* ocupa todo el ancho disponible */
-  height: auto;     /* mantiene proporción */
-  max-width: 56px;  /* opcional, limita tamaño de la imagen */
-  object-fit: contain;
-  margin-bottom: 8px;
-}
-
-/* Texto */
-.achievement-description {
-  color: black;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.achievement-info {
-  color: #374151;
-}
-
-/* Botonera */
-.achievement-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-/* Animación opcional de entrada */
-.achievement-overlay {
-  animation: achievementFadeIn 0.3s ease-out;
-}
-
-.achievement-modal {
-  animation: achievementModalIn 0.25s ease-out;
-}
-
-@keyframes achievementFadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-
-
-
-  `;
-
+ 
 
   //
   // App interface
@@ -921,10 +684,10 @@ export default function CladesPrototype(){
             </div>
 
             <div style={{marginTop:16}}>
-              <div className="small">Precisión por rango</div>
+              <div className="small">Porcentaje de aciertos por rango</div>
               {RANKS.map(r => (
                 <div key={r} className="progress-row">
-                  <div style={{width:90,textTransform:'capitalize'}}>{r}</div>
+                  <div style={{width:90,textTransform:'capitalize'}}>{RANKS_ES[r]}</div>
                   <div className="progress-bar">
                     <div className="progress-fill" style={{width: `${Math.round(profileData.rankPct[r])}%`}} />
                   </div>
@@ -1108,7 +871,7 @@ export default function CladesPrototype(){
               <div className="row" key={rank}>
                 <div className="col">
                   <>
-                    <label>{rank.charAt(0).toUpperCase() + rank.slice(1)}</label>
+                    <label>{RANKS_ES[rank]}</label>
 
                     {/* Input + botones */}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1147,17 +910,32 @@ export default function CladesPrototype(){
                         <button
                           className="ghost"
                           style={{
-                            padding: '0 12px',
+                            padding: 0,
                             fontWeight: 'bold',
                             height: '40px',
+                            width: '40px',
                             display: 'flex',
                             alignItems: 'center',
-                            justifyContent: 'center'
+                            justifyContent: 'center',
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer'
                           }}
                           onClick={() => togglePopup(rank)}
+                          aria-label="Información"
                         >
-                          ?
+                          <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 50 50"
+                              width="28"
+                              height="28"
+                              fill="currentColor"
+                              style={{ display: 'block' }}
+                            >
+                              <path d="M 25 2 C 12.309295 2 2 12.309295 2 25 C 2 37.690705 12.309295 48 25 48 C 37.690705 48 48 37.690705 48 25 C 48 12.309295 37.690705 2 25 2 z M 25 4 C 36.609824 4 46 13.390176 46 25 C 46 36.609824 36.609824 46 25 46 C 13.390176 46 4 36.609824 4 25 C 4 13.390176 13.390176 4 25 4 z M 25 11 A 3 3 0 0 0 22 14 A 3 3 0 0 0 25 17 A 3 3 0 0 0 28 14 A 3 3 0 0 0 25 11 z M 21 21 L 21 23 L 22 23 L 23 23 L 23 36 L 22 36 L 21 36 L 21 38 L 22 38 L 23 38 L 27 38 L 28 38 L 29 38 L 29 36 L 28 36 L 27 36 L 27 21 L 26 21 L 22 21 L 21 21 z" />
+                          </svg>
                         </button>
+
                       )}
                     </div>
 
@@ -1178,68 +956,43 @@ export default function CladesPrototype(){
                       </div>
                     )}
 
-                    {/* Popup */}
+                    {/* Popup Wikipedia Info */}
                     {currentCategory && popupVisible[currentCategory] && (
-                      <div
-                          style={{
-                          position: 'fixed',
-                          top: 0,
-                          left: 0,
-                          width: '100vw',
-                          height: '100vh',
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          backgroundColor: 'rgba(0,0,0,0.4)',
-                          zIndex: 9999,
-                          padding: 16, // importante para que no toque los bordes
-                          boxSizing: 'border-box'
-                        }}
-                      >
-                        <div
-                          style={{
-                            background: '#fff',
-                            borderRadius: 12,
-                            padding: 24,
-                            maxWidth: 400,
-                            width: '100%',
-                            maxHeight: '90vh',       // aquí limitamos la altura del popup
-                            overflowY: 'auto',       // scroll si el contenido supera la altura
-                            position: 'relative',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-                          }}
-                        >
+                      <div className="wiki-popup-overlay">
+                        <div className="wiki-popup-content">
                           {/* Botón cerrar */}
                           <button
+                            className="wiki-popup-close-btn"
                             onClick={() =>
                               setPopupVisible(prev => ({ ...prev, [currentCategory]: false }))
                             }
-                            style={{
-                              position: 'absolute',
-                              top: 12,
-                              right: 12,
-                              border: 'none',
-                              background: 'transparent',
-                              fontSize: 20,
-                              cursor: 'pointer',
-                              color: '#333'
-                            }}
                           >
                             ×
                           </button>
 
-                          <h3 style={{ marginTop: 0 }}>{currentCategory}</h3>
+                          <h3 className="wiki-popup-title">{currentCategory}</h3>
                           <p>{wikiInfo[currentCategory]?.text || 'Cargando información...'}</p>
                           {wikiInfo[currentCategory]?.image && (
                             <img
                               src={wikiInfo[currentCategory].image}
                               alt={currentCategory}
-                              style={{ width: '100%', marginTop: 12, borderRadius: 8 }}
+                              className="wiki-popup-image"
                             />
                           )}
+
+                          {/* Enlace a Wikipedia */}
+                          <a
+                            className="wiki-popup-link"
+                            href={`https://es.wikipedia.org/wiki/${encodeURIComponent(currentCategory)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Wikipedia
+                          </a>
                         </div>
                       </div>
                     )}
+
 
                     {/* Achievement popup */}
                     {achievementPopup && (
@@ -1308,12 +1061,6 @@ export default function CladesPrototype(){
 
           <button className="ghost" onClick={showSolution}>Solucion</button>
         </div>
-
-        {lastResult && (
-          <div style={{marginTop:10,fontWeight:700}}>
-            Resultado: {lastResult.points} puntos en esta ronda.
-          </div>
-        )}
 
       </div>
     </div>
