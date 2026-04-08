@@ -2,9 +2,20 @@
   // App style
   //
 
-  export const appStyles = `:root{--bg:#f7fbff;--card:#ffffff;--accent:rgba(58, 105, 99, 0.9);--muted:#6b7280}
-  .wrap{max-width:720px;margin:18px auto;padding:12px;font-family:Inter,system-ui,Segoe UI,Helvetica,Arial,sans-serif}
-  .card{background:var(--card);border-radius:12px;box-shadow:0 6px 18px rgba(20,30,60,0.06);padding:14px}
+  export const appStyles = `:root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --accent: #0b5b37;
+    --secondary: #fcde6c;
+    --green-med: #7aa863;
+    --green-light: #b9d26e;
+    --green-lime: #eaee95;
+    --muted: #64748b;
+    --text-dark: #1e293b;
+    --border: #e2e8f0;
+  }
+  .wrap{max-width:720px;margin:18px auto;padding:12px;font-family:Inter,system-ui,Segoe UI,Helvetica,Arial,sans-serif;color:var(--text-dark)}
+  .card{background:var(--card);border-radius:18px;box-shadow:0 10px 25px rgba(11, 91, 55, 0.08);padding:20px;border: 1px solid var(--border)}
   header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
   h1{font-size:18px;margin:0}
   .meta{color:var(--muted);font-size:13px}
