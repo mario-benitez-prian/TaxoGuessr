@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/TaxoGuessr/static/css/main.e6c13ad2.css",
-    "main.js": "/TaxoGuessr/static/js/main.3dbba40f.js",
+    "main.js": "/TaxoGuessr/static/js/main.f4819a7f.js",
     "static/js/453.2146d663.chunk.js": "/TaxoGuessr/static/js/453.2146d663.chunk.js",
     "index.html": "/TaxoGuessr/index.html",
     "main.e6c13ad2.css.map": "/TaxoGuessr/static/css/main.e6c13ad2.css.map",
-    "main.3dbba40f.js.map": "/TaxoGuessr/static/js/main.3dbba40f.js.map",
+    "main.f4819a7f.js.map": "/TaxoGuessr/static/js/main.f4819a7f.js.map",
     "453.2146d663.chunk.js.map": "/TaxoGuessr/static/js/453.2146d663.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e6c13ad2.css",
-    "static/js/main.3dbba40f.js"
+    "static/js/main.f4819a7f.js"
   ]
 }
