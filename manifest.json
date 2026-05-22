@@ -3,14 +3,14 @@
   "name": "TaxoGuessr: Clasificación Taxonómica",
   "icons": [
     {
-      "src": "Logo_only_2.png",
-      "type": "image/png",
+      "src": "Logo_only_2.jpg",
+      "type": "image/jpeg",
       "sizes": "512x512",
       "purpose": "any"
     },
     {
-      "src": "Logo_only_2.png",
-      "type": "image/png",
+      "src": "Logo_only_2.jpg",
+      "type": "image/jpeg",
       "sizes": "192x192",
       "purpose": "any maskable"
     }
