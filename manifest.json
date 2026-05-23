@@ -12,7 +12,7 @@
       "src": "Logo_only_2.jpg",
       "type": "image/jpeg",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "start_url": ".",
